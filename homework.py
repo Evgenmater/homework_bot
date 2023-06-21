@@ -159,30 +159,11 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
         try:
-            timestamp = 0
-            # timestamp = int(time.time())
+            timestamp = int(time.time())
             response_api = get_api_answer(timestamp)
             if check_response(response_api):
                 message = parse_status(response_api['homeworks'][0])
                 send_message(bot, message)
-        except exceptions.MainRequest as error:
-            logger.error(error)
-        except requests.RequestException as error:
-            logger.error(error)
-        except exceptions.DecodingFailed as error:
-            logger.error(error)
-        except exceptions.MissingDataDict as error:
-            logger.error(error)
-        except exceptions.HomeworkErrorDict as error:
-            logger.error(error)
-        except exceptions.HomeworkKey as error:
-            logger.error(error)
-        except exceptions.HomeworkStatus as error:
-            logger.error(error)
-        except exceptions.TypeErrorDict as error:
-            logger.error(error)
-        except exceptions.TypeErrorList as error:
-            logger.error(error)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
