@@ -59,8 +59,7 @@ def check_tokens():
             )
             error_flag = False
     logger.info('Переменные окружения доступны')
-    if error_flag:
-        return error_flag
+    return error_flag
 
 
 def send_message(bot, message):
