@@ -2,16 +2,14 @@ import logging
 import os
 import sys
 import time
-
-import requests
-import telegram
-
-import exceptions
-
 from http import HTTPStatus
 from logging import FileHandler, StreamHandler
 
+import requests
+import telegram
 from dotenv import load_dotenv
+
+import exceptions
 
 load_dotenv()
 
@@ -53,23 +51,23 @@ def check_tokens():
         'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
         'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID,
     }
+    error_flag = True
     for name, var in environment_variables.items():
         if not var:
             logger.critical(
                 f'Отсутствие обязательных переменных окружения {name}'
             )
-    for name, var in environment_variables.items():
-        if not var:
-            return False
+            error_flag = False
     logger.info('Переменные окружения доступны')
-    return True
+    if error_flag:
+        return error_flag
 
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-    except Exception as error:
+    except exceptions.TelegramError as error:
         logger.error(f'Ошибка при запросе к основному API: {error}')
     logger.debug('Удачная отправка сообщения в Telegram')
 
@@ -78,21 +76,21 @@ def get_api_answer(timestamp):
     """Делает запрос к API."""
     payload = {'from_date': timestamp}
     try:
+        logger.info(
+            f'Параметры переданные при запросе: Url - {ENDPOINT}; '
+            f'Авторизация - {HEADERS}; Метка времени {payload}.'
+        )
         response = requests.get(
             ENDPOINT,
             headers=HEADERS,
             params=payload
-        )
-        logger.info(
-            f'Параметры переданные при запросе: Url - {ENDPOINT}; '
-            f'Авторизация - {HEADERS}; Метка времени {payload}.'
         )
     except Exception as error:
         raise exceptions.MainRequest(
             f'Ошибка при запросе к основному API: {error}'
         )
     if response.status_code != HTTPStatus.OK:
-        raise requests.RequestException(
+        raise exceptions.HttpError(
             f'Не ожидаемый HTTP статус {response.status_code}'
         )
     try:
@@ -114,7 +112,7 @@ def check_response(response):
     for key in response:
         if key not in keys:
             raise exceptions.MissingDataDict(
-                'Отсутствуют данные "current_date" или "homeworks" в API'
+                f'Отсутствуют данные - {key} в API'
             )
 
     homework = response.get('homeworks')
@@ -142,7 +140,6 @@ def parse_status(homework):
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
-        logger.error(f'Отсутствует статус работы {homework_status}')
         raise exceptions.HomeworkStatus(
             f'Отсутствует статус работы {homework_status}'
         )
@@ -157,17 +154,21 @@ def main():
     if not check_tokens():
         raise exceptions.AbsenceVariables('Отсутствует токен')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    telegram_message = ''
     while True:
         try:
             timestamp = int(time.time())
             response_api = get_api_answer(timestamp)
             if check_response(response_api):
-                message = parse_status(response_api['homeworks'][0])
-                send_message(bot, message)
+                if response_api['homeworks']:
+                    message = parse_status(response_api['homeworks'][0])
+                    send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
-            send_message(bot, message)
+            if message != telegram_message:
+                telegram_message = message
+                send_message(bot, message)
         finally:
             time.sleep(RETRY_PERIOD)
             timestamp = int(time.time())

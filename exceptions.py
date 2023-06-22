@@ -44,3 +44,15 @@ class HomeworkStatus(KeyError):
     """Отсутствует статус домашней работы."""
 
     pass
+
+
+class HttpError(Exception):
+    """Сбой в работе программы: Эндпоинт API-сервиса недоступен."""
+
+    pass
+
+
+class TelegramError(Exception):
+    """Сбой в работе программы при отправке сообщения."""
+
+    pass
